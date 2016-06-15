@@ -1,0 +1,22 @@
+{
+    "name": "friendlines-convert-1",
+    "version": "0.0.1",
+    "description": "Transforms raw message data to drawable meta.",
+    "main": "app.js",
+    "scripts": {
+        
+    },
+    "keywords": [
+        "facebook",
+        "history",
+        "analize",
+        "mood",
+		"convert"
+    ],
+    "author": "Bendeguy",
+    "license": "ISC",
+    "dependencies": {
+        "progress": "^1.1.8"
+
+	}
+}
