@@ -1,13 +1,74 @@
 define([
-    'ko'
+    'knockout'
 
 ], function(ko) {
 
     return process2;
 
-    function process2() {
+    function process2(userActivity, filter) {
 
+        var ret = {
+            firstMonthKey: undefined,
+            lastMonthKey: undefined,
+            filteredUsers: {}
+        };
+
+        for (var userId in userActivity) {
+            var drawUser = true;
+            var user = userActivity[userId];
+
+            /* Check for all minimum keys set in filter */
+            drawUser = drawUser && isUserFulfillingMinimumRequirements(user, filter.min);
+
+            /* Check, for minimum active months */
+            drawUser = drawUser && (user.sums.activeMonthCount > filter.minActiveMonthCount);
+            if (drawUser) {
+                ret.filteredUsers[userId] = user;
+
+                /* Search for the last month to render */
+                if (!ret.firstMonthKey) {
+                    ret.firstMonthKey = user.firstMonthKey;
+                    ret.lastMonthKey = user.lastMonthKey;
+                }
+                if (user.lastMonthKey > ret.lastMonthKey) ret.lastMonthKey = user.lastMonthKey;
+                if (user.firstMonthKey < ret.firstMonthKey) ret.firstMonthKey = user.firstMonthKey;
+            }
+        }
+        return ret;
     }
+
+    
+
+
+    /**
+     * Everything put into the filter.min will be checked
+     * if reaching the minimum required value.
+     * If not, return false.
+     */
+
+    function isUserFulfillingMinimumRequirements(user, minimums) {
+        for (var k in minimums) {
+            if (user.sums[k] < minimums[k]) return false;
+        }
+        return true;
+    }
+
+    // function filterMonthsWithNotEnoughMessageCount(user, minMonthCount) {
+    //     for (var yyyymm in user.monthData) {
+    //         if (user.monthData[yyyymm].sum.count < minMonthCount) {
+    //             delete user.monthData[yyyymm];
+    //         }
+    //     }
+    // }
+
+    // function filterMonthsWithNotEnoughMessageLength(user) {
+    //     for (var yyyymm in user.monthData) {
+    //         if (user.monthData[yyyymm].sum.length < minMonthCount) {
+    //             delete user.monthData[yyyymm];
+    //         }
+    //     }
+    // }
+
 
     function process1(userActivity, filter) {
         var startKey = Object.keys(userActivity[Object.keys(userActivity)[0]])[0];
@@ -15,8 +76,8 @@ define([
             regulars: [],
             trespassers: [],
             usermap: {},
-            startMonth: startKey,
-            endMonth: startKey
+            firstMonthKey: startKey,
+            lastMonthKey: startKey
         }
 
         var users = [];
@@ -29,7 +90,7 @@ define([
                 sums[s] = {
                     cnt: 0,
                     leng: 0,
-                    startMonth: Object.keys(userActivity[user])[0]
+                    firstMonthKey: Object.keys(userActivity[user])[0]
                 }
             })
 
@@ -57,12 +118,12 @@ define([
                 monthData: userActivity[user],
                 sums: sums,
                 color: colors[colorIndex++],
-                startMonth: Object.keys(userActivity[user])[0],
-                endMonth: Object.keys(userActivity[user])[Object.keys(userActivity[user]).length - 1]
+                firstMonthKey: Object.keys(userActivity[user])[0],
+                lastMonthKey: Object.keys(userActivity[user])[Object.keys(userActivity[user]).length - 1]
             }
             users.push(userToInsert);
-            if (userToInsert.startMonth < ret.startMonth) ret.startMonth = userToInsert.startMonth;
-            if (userToInsert.endMonth > ret.endMonth) ret.endMonth = userToInsert.endMonth;
+            if (userToInsert.firstMonthKey < ret.firstMonthKey) ret.firstMonthKey = userToInsert.firstMonthKey;
+            if (userToInsert.lastMonthKey > ret.lastMonthKey) ret.lastMonthKey = userToInsert.lastMonthKey;
         }
 
 

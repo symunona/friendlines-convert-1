@@ -1,22 +1,28 @@
 {
-    "name": "friendlines-convert-1",
-    "version": "0.0.1",
-    "description": "Transforms raw message data to drawable meta.",
-    "main": "app.js",
-    "scripts": {
-        
-    },
-    "keywords": [
-        "facebook",
-        "history",
-        "analize",
-        "mood",
-		"convert"
-    ],
-    "author": "Bendeguy",
-    "license": "ISC",
-    "dependencies": {
-        "progress": "^1.1.8"
-
-	}
+  "name": "friendlines-convert-1",
+  "version": "0.0.1",
+  "description": "Transforms raw message data to drawable meta.",
+  "main": "app.js",
+  "scripts": {},
+  "keywords": [
+    "facebook",
+    "history",
+    "analize",
+    "mood",
+    "convert"
+  ],
+  "author": {
+    "name": "Bendeguy"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "progress": "^1.1.8"
+  },
+  "gitHead": "99ea8ba6d6cb36e2eae000d0b878c2008926d8b7",
+  "readme": "# Facebook History Message Converter 1\r\n\r\nCreates the necessary conversions to draw nice looking activity graphs.\r\n\r\n\r\n",
+  "readmeFilename": "readme.md",
+  "_id": "friendlines-convert-1@0.0.1",
+  "_shasum": "a0336f2c683e26d996c8a7d9bb171c17d6f753ed",
+  "_from": "git+https://git@github.com/symunona/friendlines-convert-1.git",
+  "_resolved": "git+https://git@github.com/symunona/friendlines-convert-1.git#99ea8ba6d6cb36e2eae000d0b878c2008926d8b7"
 }
