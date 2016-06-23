@@ -1,41 +1,135 @@
 define([
-    'knockout'
+    'knockout',
+    './draw-utils',
+    'd3',
+    'moment'
 
-], function(ko) {
+], function(ko, utils, d3, moment) {
+    var dataLength = 5;
+    var data = [];
+
+    for (var i = 0; i < dataLength; i++) data.push({
+        timekey: i,
+        inbound: Math.random(), // * i * (dataLength - i),
+        // y0: Math.random() * i * (dataLength - i),
+        outbound: i * (dataLength - i), //Math.random() * i * (dataLength - i)
+    });
+
+
+    function dataAtY(y) {
+        var a = data.slice();
+        a = a.map(function(e, i) {
+            return $.extend({}, e, {
+                inbound: e.inbound,
+                outbound: ((i % 2) ? 0 : 1) * e.outbound
+            });
+        });
+        return a;
+    }
 
     return draw;
 
-    function draw() {
+    function draw(selector, userActivity, params, filter) {
 
+        // for testing
+        userActivity = userActivity.slice(5, 6);
+
+        var firstAndLastMonthKey = utils.getFirstAndLastMonthKey(userActivity);
+        var dataLength = getSlotDifference(
+            firstAndLastMonthKey.lastMonthKey, firstAndLastMonthKey.firstMonthKey);
+
+
+        var userDrawData = flattenUserData(userActivity, firstAndLastMonthKey.firstMonthKey, dataLength);
+        console.log(userDrawData);
+        var height = params.yStep * (Object.keys(userActivity).length + 2);
+        var width = params.xStep * (dataLength);
+        // console.log(width, height);
+
+        var keyToVisualize = 'count';
+
+        console.log('x,y: ', width, height);
+        console.log('length: ', dataLength);
+
+        /* Initialize new SVG */
+        var svg = d3.select(selector).append("svg")
+            .attr("width", width)
+            .attr("style", "margin-top: 150px")
+            .attr("height", height);
+        var y = d3.scale.linear()
+            .domain([-1000, 1000])
+            .range([0, height]);
+
+        var x = d3.scale.linear()
+            .domain([0, dataLength])
+            .range([0, width]);
+
+        /* Drawing functions MR HARDWIRE */
+        var area = d3.svg.area()
+            .x(function(d, i) {
+                // console.log('x', arguments)
+                return x(i);
+            })
+            .y(function(d) {
+                console.log(d.inbound[keyToVisualize] || 0);
+                return d.inbound[keyToVisualize] || 0;
+            })
+            .y1(function(d) {
+                return 0;
+                // y(d.outbound[keyToVisualize] || 0);
+            });
+
+        var color = d3.scale.linear()
+            .range(["#aad", "#556"]);
+
+        svg.selectAll("path")
+            .data(userDrawData)
+            .enter()
+            .append('g')
+            .attr('height', 50)
+            .attr('width', 100)
+            .attr('y', function(d, i) {
+                return i * 70
+            })
+            .attr('class', 'markerr')
+            .append("path")
+            .attr("d", area)
+            // .attr("")
+            .attr("userId", function(d, i) {
+                return Object.keys(userActivity)[i];
+            })
+            .style("fill", function() {
+                return color(Math.random());
+            });
+
+        return;
     }
 
-    function createUserGroup(userActivity, params, offset) {
-        var drawArrayTop = createUserActivityArray(userActivity, 'inbound', params.numberKey);
-        var drawArrayBottom = createUserActivityArray(userActivity, 'inbound', params.numberKey);
 
-        for (var i = 0; i <= drawArrayTop.length; i++) {
-            var lastValue = i > 0 ? drawArrayTop[i - 1] : 0;
-            var currentValue = (i == drawArrayTop.length) ? 0 : drawArrayTop[i];
-            // TODO: CREATE SVG POLILINE
-        }
+    function flattenUserData(userActivity, startSlot, dataLength) {
+        return Object.keys(userActivity).map(function(userId) {
+            return createUserActivityArray(userActivity[userId], startSlot, dataLength);
+        })
     }
 
     /**
-     *  Takes the key which will be visualized 
+     *  @returns the user line data.
      */
 
-    function createUserActivityArray(userActivity, direction, numberKey) {
-        /* This is the zero reference for the activity array */
-        var startSlot = Object.keys(userActivity)[0];
+    function createUserActivityArray(userActivity, startSlot, dataLength) {
+
         var activityArray = [];
 
-        for (var i = 0; i < getStartAndEndDifference(userActivity); i++) {
+        for (var i = 0; i < dataLength; i++) {
             var timeSlotKey = addTimeKey(startSlot, i);
-            if (userActivity[timeSlotKey]) {
-                activityArray.push(userActivity[timeSlotKey][direction][numberKey]);
-            } else {
-                activityArray.push(0);
-            }
+
+            activityArray.push(_.extend({
+                timeSlot: i,
+                timeSlotKey: timeSlotKey,
+                inbound: {},
+                outbound: {},
+                sums: {}
+            }, userActivity.monthData[timeSlotKey]));
+
         }
         return activityArray;
     }
