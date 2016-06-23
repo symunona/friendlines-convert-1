@@ -55,9 +55,18 @@ define([
             .attr("width", width)
             .attr("style", "margin-top: 150px")
             .attr("height", height);
+        var maxY = d3.max(userDrawData.map(function(oneUserData) {
+            return d3.max(oneUserData.map(function(dataPoint) {
+                return d3.max([dataPoint.inbound[keyToVisualize] || 0, dataPoint.inbound[keyToVisualize] || 0]);
+            }));
+
+
+        }));
+        console.log('length: ', maxY);
+
         var y = d3.scale.linear()
-            .domain([-1000, 1000])
-            .range([0, height]);
+            .domain([-maxY, maxY])
+            .range([-params.yStep, params.yStep]);
 
         var x = d3.scale.linear()
             .domain([0, dataLength])
@@ -70,11 +79,13 @@ define([
                 return x(i);
             })
             .y(function(d) {
+                console.log(arguments);
                 console.log(d.inbound[keyToVisualize] || 0);
-                return d.inbound[keyToVisualize] || 0;
+                return y(d.inbound[keyToVisualize] || 0);
             })
             .y1(function(d) {
-                return 0;
+                return -d.outbound[keyToVisualize] || 0;
+
                 // y(d.outbound[keyToVisualize] || 0);
             });
 
@@ -85,10 +96,8 @@ define([
             .data(userDrawData)
             .enter()
             .append('g')
-            .attr('height', 50)
-            .attr('width', 100)
-            .attr('y', function(d, i) {
-                return i * 70
+            .attr("transform", function(d, i) {
+                return 'translate(0,' + (((i + 1) * params.yStep) + ')');
             })
             .attr('class', 'markerr')
             .append("path")
@@ -119,7 +128,7 @@ define([
 
         var activityArray = [];
 
-        for (var i = 0; i < dataLength; i++) {
+        for (var i = -1; i < dataLength; i++) {
             var timeSlotKey = addTimeKey(startSlot, i);
 
             activityArray.push(_.extend({
