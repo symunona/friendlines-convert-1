@@ -12,10 +12,10 @@ define([
     function draw(selector, userActivity, params, filter, colors) {
 
         var firstAndLastMonthKey = utils.getFirstAndLastMonthKey(userActivity);
-        var dataLength = getSlotDifference(
+        var dataTimeLength = getSlotDifference(
             firstAndLastMonthKey.lastMonthKey, firstAndLastMonthKey.firstMonthKey);
 
-        var userDrawData = flattenUserData(userActivity, firstAndLastMonthKey.firstMonthKey, dataLength);
+        var userDrawData = flattenUserData(userActivity, firstAndLastMonthKey.firstMonthKey, dataTimeLength);
         console.log('Drawing: ', userDrawData);
 
         var keyToVisualize = 'count';
@@ -47,7 +47,7 @@ define([
             .range([params.yStep * 2, (userActivity.length * params.yStep * 2) + (params.yStep * 2)]);
 
         var x = d3.scale.linear()
-            .domain([0, dataLength])
+            .domain([0, dataTimeLength])
             .range([0, width]);
 
         /* Drawing functions, hi my name is MR HARDWIRE */
@@ -73,13 +73,12 @@ define([
                 return 0;
             }).interpolate('basis');
 
-        var color = d3.scale.linear()
-            .range(["#aad", "#556"]);
 
-        /* Time axis */
+        /* Time axis. Create +2 for pufferning the data end */
         var xAxis = d3.svg.axis()
             .scale(x)
             .orient("bottom")
+            .tickValues(_.range(dataTimeLength + 2))
             .tickSize(-height)
             .tickFormat(function(val) {
                 var timeKey = addTimeKey(firstAndLastMonthKey.firstMonthKey, val - 1);
@@ -93,7 +92,7 @@ define([
         var yAxis = d3.svg.axis()
             .scale(y2)
             .orient("left")
-            .tickSize(maxY / 4)
+            .tickSize(-width)
             .tickValues(userActivity.map(function(user, index) {
                 return index;
             }))
@@ -112,28 +111,27 @@ define([
         var svg = d3.select(selector).append("svg")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
+            /* Transform the margin */
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
             .call(zoom);
 
+        /* The viewport */
         svg.append("rect")
             .attr("width", width)
             .attr("height", height)
             .attr("class", "mainrect");
 
-        var container = svg.append("g");
+        /* Zoom container */
+        var zoomContainer = svg.append("g");
 
-        // TEMP reference 
-        container.append("rect")
-            .attr("fill", "red")
-            .attr("width", params.xStep)
-            .attr("height", params.yStep * 2);
+        // TEMP reference square
+        zoomContainer.append("rect")
+            .attr("fill", "rgba(200,200,200,0.2)")
+            .attr('transform', 'translate(0,' + y2(-0.5) + ')')
+            .attr("width", x(1))
+            .attr("height", 2 * params.yStep);
 
-        container.append("rect")
-            .attr("fill", "green")
-            .attr("width", params.xStep)
-            .attr("height", params.yStep * 2)
-            .attr("transform", "translate(0," + (params.yStep * 2) + ")");
 
         /* Appending the axes */
         var timeAxisNodes = svg.append("g")
@@ -146,18 +144,27 @@ define([
             .call(yAxis);
 
         /* Conent */
-        var groups = container.selectAll("path")
+        var groups = zoomContainer.selectAll("path")
             .data(userDrawData)
             .enter()
             .append('g');
 
-        /* Top part of the graphs */
+
+
         groups.attr("transform", function(d, i) {
-                return 'translate(0,' + (((i + 1) * params.yStep * 2) + ')');
-            })
-            .attr('class', 'markerr top')
-            .append("path")
+            return 'translate(0,' + (((i + 1) * params.yStep * 2) + ')');
+        }).attr('class', 'markerr');
+
+        groups.append('rect')
+            .attr('width', x(dataTimeLength + 2))
+            .attr('height', maxY / 2)
+            .attr('transform', 'translate(0,' + (-maxY / 4) + ')')
+            .attr('class', 'userBoundingBox');
+
+        /* Top part of the graphs */
+        groups.append("path")
             .attr("d", areaTop)
+            .attr('class', 'top')
             .attr("userId", function(d, i) {
                 return Object.keys(userActivity)[i];
             })
@@ -165,47 +172,48 @@ define([
                 return colors[userActivity[index].id];
             });
 
+        /* Bottom part of the graph */
         groups.append("path")
             .attr("d", areaBottom)
-            .attr('class', 'markerr bottom')
+            .attr('class', 'bottom')
             .attr("userId", function(d, i) {
                 return Object.keys(userActivity)[i];
             })
             .style("fill", function(data, index) {
                 return colors[userActivity[index].id];
             });
-        console.log(timeAxisNodes);
 
-        // timeAxisNodes.selectAll('text').each(function() {
-        //     console.log(this, arguments)
-        //     if (+this.textContent) {
-        //         this.parentNode.classList.add("year");
-        //     }
-        // });
+
+        emphasizeYearTicks(timeAxisNodes);
 
         function zoomed() {
 
             svg.select(".x.axis").call(xAxis);
             svg.select(".y.axis").call(yAxis);
-            container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-
-            timeAxisNodes.selectAll('text').each(function() {
-                console.log(this, arguments)
-                if (+this.textContent) {
-                    this.parentNode.classList.add("year");
-                }
-            });
+            zoomContainer.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+            emphasizeYearTicks(timeAxisNodes);
         }
 
 
         return;
     }
 
+    function emphasizeYearTicks(timeAxisNodes) {
+        timeAxisNodes.selectAll('text').each(function() {
+            if (+this.textContent) {
+                this.parentNode.classList.add("year");
+            }
+        });
+    }
+
+    function createUserAxe() {
+        return;
+    }
 
     function flattenUserData(userActivity, startSlot, dataLength) {
         return Object.keys(userActivity).map(function(userId) {
             return createUserActivityArray(userActivity[userId], startSlot, dataLength);
-        })
+        });
     }
 
     /**
@@ -215,8 +223,9 @@ define([
     function createUserActivityArray(userActivity, startSlot, dataLength) {
 
         var activityArray = [];
-
-        for (var i = -1; i < dataLength; i++) {
+        /* Counting from -1 to dataLength+1 creates a puffer zone 
+          at the beginning and at the end to be nicer looking. */
+        for (var i = -1; i <= dataLength + 1; i++) {
             var timeSlotKey = addTimeKey(startSlot, i);
 
             activityArray.push(_.extend({
