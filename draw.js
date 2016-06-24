@@ -4,57 +4,31 @@ define([
     'd3',
     'moment'
 
+
 ], function(ko, utils, d3, moment) {
-    var dataLength = 5;
-    var data = [];
-
-    for (var i = 0; i < dataLength; i++) data.push({
-        timekey: i,
-        inbound: Math.random(), // * i * (dataLength - i),
-        // y0: Math.random() * i * (dataLength - i),
-        outbound: i * (dataLength - i), //Math.random() * i * (dataLength - i)
-    });
-
-
-    function dataAtY(y) {
-        var a = data.slice();
-        a = a.map(function(e, i) {
-            return $.extend({}, e, {
-                inbound: e.inbound,
-                outbound: ((i % 2) ? 0 : 1) * e.outbound
-            });
-        });
-        return a;
-    }
 
     return draw;
 
-    function draw(selector, userActivity, params, filter) {
-
-        // for testing
-        userActivity = userActivity.slice(5, 6);
+    function draw(selector, userActivity, params, filter, colors) {
 
         var firstAndLastMonthKey = utils.getFirstAndLastMonthKey(userActivity);
         var dataLength = getSlotDifference(
             firstAndLastMonthKey.lastMonthKey, firstAndLastMonthKey.firstMonthKey);
 
-
         var userDrawData = flattenUserData(userActivity, firstAndLastMonthKey.firstMonthKey, dataLength);
-        console.log(userDrawData);
-        var height = params.yStep * (Object.keys(userActivity).length + 2);
-        var width = params.xStep * (dataLength);
-        // console.log(width, height);
+        console.log('Drawing: ', userDrawData);
 
         var keyToVisualize = 'count';
 
-        console.log('x,y: ', width, height);
-        console.log('length: ', dataLength);
+        var margin = {
+                top: 32,
+                right: 0,
+                bottom: 50,
+                left: 100
+            },
+            width = window.innerWidth - margin.left - margin.right,
+            height = window.innerHeight - margin.top - margin.bottom;
 
-        /* Initialize new SVG */
-        var svg = d3.select(selector).append("svg")
-            .attr("width", width)
-            .attr("style", "margin-top: 150px")
-            .attr("height", height);
         var maxY = d3.max(userDrawData.map(function(oneUserData) {
             return d3.max(oneUserData.map(function(dataPoint) {
                 return d3.max([dataPoint.inbound[keyToVisualize] || 0, dataPoint.inbound[keyToVisualize] || 0]);
@@ -62,53 +36,167 @@ define([
 
 
         }));
-        console.log('length: ', maxY);
+        console.log('maxY: ', maxY);
 
         var y = d3.scale.linear()
-            .domain([-maxY, maxY])
+            .domain([-maxY / 4, maxY / 4])
             .range([-params.yStep, params.yStep]);
+
+        var y2 = d3.scale.linear()
+            .domain([0, userActivity.length])
+            .range([params.yStep * 2, (userActivity.length * params.yStep * 2) + (params.yStep * 2)]);
 
         var x = d3.scale.linear()
             .domain([0, dataLength])
             .range([0, width]);
 
-        /* Drawing functions MR HARDWIRE */
-        var area = d3.svg.area()
+        /* Drawing functions, hi my name is MR HARDWIRE */
+        var areaTop = d3.svg.area()
             .x(function(d, i) {
-                // console.log('x', arguments)
                 return x(i);
             })
             .y(function(d) {
-                console.log(arguments);
-                console.log(d.inbound[keyToVisualize] || 0);
-                return y(d.inbound[keyToVisualize] || 0);
+                return 0;
             })
             .y1(function(d) {
-                return -d.outbound[keyToVisualize] || 0;
+                return y(-d.inbound[keyToVisualize] || 0);
+            }).interpolate('basis');
 
-                // y(d.outbound[keyToVisualize] || 0);
-            });
+        var areaBottom = d3.svg.area()
+            .x(function(d, i) {
+                return x(i);
+            })
+            .y(function(d) {
+                return y(d.outbound[keyToVisualize] || 0);
+            })
+            .y1(function(d) {
+                return 0;
+            }).interpolate('basis');
 
         var color = d3.scale.linear()
             .range(["#aad", "#556"]);
 
-        svg.selectAll("path")
+        /* Time axis */
+        var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient("bottom")
+            .tickSize(-height)
+            .tickFormat(function(val) {
+                var timeKey = addTimeKey(firstAndLastMonthKey.firstMonthKey, val - 1);
+                if (timeKey.substr(4, 2) == '01')
+                    return timeKey.substr(0, 4);
+                else
+                    return (moment().month(parseInt(timeKey.substr(4, 2)) - 1).format('MMM'));
+            });
+
+        /* User list */
+        var yAxis = d3.svg.axis()
+            .scale(y2)
+            .orient("left")
+            .tickSize(maxY / 4)
+            .tickValues(userActivity.map(function(user, index) {
+                return index;
+            }))
+            .tickFormat(function(val) {
+                return userActivity[val].userName;
+            });
+
+
+        var zoom = d3.behavior.zoom()
+            .x(x)
+            .y(y2)
+            .scaleExtent([0.1, 32])
+            .on("zoom", zoomed);
+
+        $(selector).html('');
+        var svg = d3.select(selector).append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+            .call(zoom);
+
+        svg.append("rect")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("class", "mainrect");
+
+        var container = svg.append("g");
+
+        // TEMP reference 
+        container.append("rect")
+            .attr("fill", "red")
+            .attr("width", params.xStep)
+            .attr("height", params.yStep * 2);
+
+        container.append("rect")
+            .attr("fill", "green")
+            .attr("width", params.xStep)
+            .attr("height", params.yStep * 2)
+            .attr("transform", "translate(0," + (params.yStep * 2) + ")");
+
+        /* Appending the axes */
+        var timeAxisNodes = svg.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis);
+
+        svg.append("g")
+            .attr("class", "y axis")
+            .call(yAxis);
+
+        /* Conent */
+        var groups = container.selectAll("path")
             .data(userDrawData)
             .enter()
-            .append('g')
-            .attr("transform", function(d, i) {
-                return 'translate(0,' + (((i + 1) * params.yStep) + ')');
+            .append('g');
+
+        /* Top part of the graphs */
+        groups.attr("transform", function(d, i) {
+                return 'translate(0,' + (((i + 1) * params.yStep * 2) + ')');
             })
-            .attr('class', 'markerr')
+            .attr('class', 'markerr top')
             .append("path")
-            .attr("d", area)
-            // .attr("")
+            .attr("d", areaTop)
             .attr("userId", function(d, i) {
                 return Object.keys(userActivity)[i];
             })
-            .style("fill", function() {
-                return color(Math.random());
+            .style("fill", function(data, index) {
+                return colors[userActivity[index].id];
             });
+
+        groups.append("path")
+            .attr("d", areaBottom)
+            .attr('class', 'markerr bottom')
+            .attr("userId", function(d, i) {
+                return Object.keys(userActivity)[i];
+            })
+            .style("fill", function(data, index) {
+                return colors[userActivity[index].id];
+            });
+        console.log(timeAxisNodes);
+
+        // timeAxisNodes.selectAll('text').each(function() {
+        //     console.log(this, arguments)
+        //     if (+this.textContent) {
+        //         this.parentNode.classList.add("year");
+        //     }
+        // });
+
+        function zoomed() {
+
+            svg.select(".x.axis").call(xAxis);
+            svg.select(".y.axis").call(yAxis);
+            container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+
+            timeAxisNodes.selectAll('text').each(function() {
+                console.log(this, arguments)
+                if (+this.textContent) {
+                    this.parentNode.classList.add("year");
+                }
+            });
+        }
+
 
         return;
     }
