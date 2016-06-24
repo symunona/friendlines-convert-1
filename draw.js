@@ -9,161 +9,132 @@ define([
 
     return draw;
 
-    function draw(selector, userActivity, params, filter, colors) {
 
+    function convertToDrawingData(userActivity, params) {
+
+        /* Get the minimum and the maximum date of the filtered data. */
         var firstAndLastMonthKey = utils.getFirstAndLastMonthKey(userActivity);
+
+        /* This many months are visualized. */
         var dataTimeLength = getSlotDifference(
             firstAndLastMonthKey.lastMonthKey, firstAndLastMonthKey.firstMonthKey);
 
+        /* According to the new starting point, create a full matrix of data do visualize. */
         var userDrawData = flattenUserData(userActivity, firstAndLastMonthKey.firstMonthKey, dataTimeLength);
-        console.log('Drawing: ', userDrawData);
 
-        var keyToVisualize = 'count';
+        /* The first layer's data will come from this key. */
+        var keyToVisualize = params.layerOneKey;
 
-        var margin = {
-                top: 32,
-                right: 0,
-                bottom: 50,
-                left: 100
-            },
-            width = window.innerWidth - margin.left - margin.right,
-            height = window.innerHeight - margin.top - margin.bottom;
-
+        /* Get the maximum values for scaling all user visualisations relatively. */
         var maxY = d3.max(userDrawData.map(function(oneUserData) {
             return d3.max(oneUserData.map(function(dataPoint) {
                 return d3.max([dataPoint.inbound[keyToVisualize] || 0, dataPoint.inbound[keyToVisualize] || 0]);
             }));
-
-
         }));
-        console.log('maxY: ', maxY);
-
-        var y = d3.scale.linear()
-            .domain([-maxY / 4, maxY / 4])
-            .range([-params.yStep, params.yStep]);
-
-        var y2 = d3.scale.linear()
-            .domain([0, userActivity.length])
-            .range([params.yStep * 2, (userActivity.length * params.yStep * 2) + (params.yStep * 2)]);
-
-        var x = d3.scale.linear()
-            .domain([0, dataTimeLength])
-            .range([0, width]);
-
-        /* Drawing functions, hi my name is MR HARDWIRE */
-        var areaTop = d3.svg.area()
-            .x(function(d, i) {
-                return x(i);
-            })
-            .y(function(d) {
-                return 0;
-            })
-            .y1(function(d) {
-                return y(-d.inbound[keyToVisualize] || 0);
-            }).interpolate('basis');
-
-        var areaBottom = d3.svg.area()
-            .x(function(d, i) {
-                return x(i);
-            })
-            .y(function(d) {
-                return y(d.outbound[keyToVisualize] || 0);
-            })
-            .y1(function(d) {
-                return 0;
-            }).interpolate('basis');
+        return {
+            userDrawData: userDrawData,
+            firstAndLastMonthKey: firstAndLastMonthKey,
+            maxY: maxY,
+            dataTimeLength: dataTimeLength,
+            keyToVisualize: keyToVisualize
+        };
+    }
 
 
-        /* Time axis. Create +2 for pufferning the data end */
-        var xAxis = d3.svg.axis()
-            .scale(x)
-            .orient("bottom")
-            .tickValues(_.range(dataTimeLength + 2))
-            .tickSize(-height)
-            .tickFormat(function(val) {
-                var timeKey = addTimeKey(firstAndLastMonthKey.firstMonthKey, val - 1);
-                if (timeKey.substr(4, 2) == '01')
-                    return timeKey.substr(0, 4);
-                else
-                    return (moment().month(parseInt(timeKey.substr(4, 2)) - 1).format('MMM'));
-            });
+    function draw(selector, userActivity, params, filter, colors) {
 
-        /* User list */
-        var yAxis = d3.svg.axis()
-            .scale(y2)
-            .orient("left")
-            .tickSize(-width)
-            .tickValues(userActivity.map(function(user, index) {
-                return index;
-            }))
-            .tickFormat(function(val) {
-                return userActivity[val].userName;
-            });
-
-
-        var zoom = d3.behavior.zoom()
-            .x(x)
-            .y(y2)
-            .scaleExtent([0.1, 32])
-            .on("zoom", zoomed);
-
+        // Clear the former graph TEMP 
         $(selector).html('');
-        var svg = d3.select(selector).append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
-            /* Transform the margin */
-            .append("g")
-            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
-            .call(zoom);
+
+        /* Calculate drawing data */
+        drawData = convertToDrawingData(userActivity, params);
+
+        /* Per user scale, take the max Y value to display
+                    and since it is very rare, get the domain double.
+                    This way it will be mapped to.  */
+
+        initializeScales(drawData, params);
+
+        createGraphFunctions(drawData);
+
+        calculateDimensions(drawData);
+
+        createAxis(drawData, userActivity);
+
+
+        drawData.zoom = d3.behavior.zoom()
+            .x(drawData.timeAxisScaleX)
+            .y(drawData.yAllGraphScale)
+            .scaleExtent([0.1, 32])
+            .on("zoom", zoomed.bind(this, drawData));
+
+
+
+        drawData.svg = (drawData.svg ? drawData.svg : d3.select(selector).append("svg"))
+            .attr("width", drawData.width + drawData.margin.left + drawData.margin.right)
+            .attr("height", drawData.height + drawData.margin.top + drawData.margin.bottom);
 
         /* The viewport */
-        svg.append("rect")
-            .attr("width", width)
-            .attr("height", height)
+        if (!drawData.initialized) {
+
+            /* Transform the margin */
+            drawData.mainContainer = drawData.svg.append("g")
+                .attr("transform", "translate(" + drawData.margin.left + "," + drawData.margin.top + ")")
+                .call(drawData.zoom);
+
+            drawData.mainrect = drawData.mainContainer.append("rect");
+
+            /* Zoom container */
+            drawData.zoomContainer = drawData.mainContainer.append("g");
+
+            // TEMP reference square
+            drawData.reference = drawData.zoomContainer.append("rect");
+
+            /* Appending the axes */
+            drawData.timeAxisNodes = drawData.mainContainer.append("g");
+
+            drawData.userAxis = drawData.mainContainer.append("g");
+        }
+
+        drawData.mainrect
+            .attr("width", drawData.width)
+            .attr("height", drawData.height)
             .attr("class", "mainrect");
 
-        /* Zoom container */
-        var zoomContainer = svg.append("g");
-
-        // TEMP reference square
-        zoomContainer.append("rect")
+        drawData.reference
             .attr("fill", "rgba(200,200,200,0.2)")
-            .attr('transform', 'translate(0,' + y2(-0.5) + ')')
-            .attr("width", x(1))
+            .attr('transform', 'translate(0,' + drawData.yAllGraphScale(-0.5) + ')')
+            .attr("width", drawData.timeAxisScaleX(1))
             .attr("height", 2 * params.yStep);
 
-
-        /* Appending the axes */
-        var timeAxisNodes = svg.append("g")
+        drawData.timeAxisNodes
             .attr("class", "x axis")
-            .attr("transform", "translate(0," + height + ")")
-            .call(xAxis);
+            .attr("transform", "translate(0," + drawData.height + ")")
+            .call(drawData.xAxis);
 
-        svg.append("g")
+        drawData.userAxis
             .attr("class", "y axis")
-            .call(yAxis);
+            .call(drawData.yAxis);
 
         /* Conent */
-        var groups = zoomContainer.selectAll("path")
-            .data(userDrawData)
-            .enter()
-            .append('g');
+        drawData.data = drawData.zoomContainer.selectAll("g")
+            .data(drawData.userDrawData);
 
+        drawData.newDataGroups = drawData.data.enter().append('g');
 
-
-        groups.attr("transform", function(d, i) {
+        drawData.newDataGroups.attr("transform", function(d, i) {
             return 'translate(0,' + (((i + 1) * params.yStep * 2) + ')');
         }).attr('class', 'markerr');
 
-        groups.append('rect')
-            .attr('width', x(dataTimeLength + 2))
-            .attr('height', maxY / 2)
-            .attr('transform', 'translate(0,' + (-maxY / 4) + ')')
+        drawData.newDataGroups.append('rect')
+            .attr('width', drawData.timeAxisScaleX(drawData.dataTimeLength + 2))
+            .attr('height', drawData.maxY / 2)
+            .attr('transform', 'translate(0,' + (-drawData.maxY / 4) + ')')
             .attr('class', 'userBoundingBox');
 
         /* Top part of the graphs */
-        groups.append("path")
-            .attr("d", areaTop)
+        drawData.newDataGroups.append("path")
+            .attr("d", drawData.areaTopGraph)
             .attr('class', 'top')
             .attr("userId", function(d, i) {
                 return Object.keys(userActivity)[i];
@@ -173,8 +144,8 @@ define([
             });
 
         /* Bottom part of the graph */
-        groups.append("path")
-            .attr("d", areaBottom)
+        drawData.newDataGroups.append("path")
+            .attr("d", drawData.areaBottomGraph)
             .attr('class', 'bottom')
             .attr("userId", function(d, i) {
                 return Object.keys(userActivity)[i];
@@ -183,21 +154,138 @@ define([
                 return colors[userActivity[index].id];
             });
 
+        drawData.data.exit().remove();
 
-        emphasizeYearTicks(timeAxisNodes);
-
-        function zoomed() {
-
-            svg.select(".x.axis").call(xAxis);
-            svg.select(".y.axis").call(yAxis);
-            zoomContainer.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-            emphasizeYearTicks(timeAxisNodes);
-        }
+        emphasizeYearTicks(drawData.timeAxisNodes);
+        drawData.initialized = true;
 
 
-        return;
     }
 
+    /**
+     * Sets up the two Y and one X scale.
+     * 
+     * The X scale is time, mapped from 
+     * the first interaction month of the
+     * actual renderable users to the last, to 
+     * (time difference in months) * (renderable users number) 
+     * 
+     * yScale is calculated from the maxY 
+     * value, and is local for every user.
+     *  
+     * yAllGraphScale is mapped from the 
+     * number of users represented to the 
+     * number of users * params.yStep * 2
+     */
+    function initializeScales(drawData, params) {
+        /* Once these assignments have been initialized, they will 
+            update on every new call. */
+        drawData.yScale = (drawData.yScale || d3.scale.linear())
+            .domain([-drawData.maxY / 4, drawData.maxY / 4])
+            .range([-params.yStep, params.yStep]);
+
+        /* Each user is one line, the double of the  */
+        drawData.yAllGraphScale = (drawData.yAllGraphScale ? drawData.yAllGraphScale : d3.scale.linear())
+            .domain([0, drawData.userDrawData.length])
+            .range([params.yStep * 2, (drawData.userDrawData.length * params.yStep * 2) + (params.yStep * 2)]);
+
+        /* Horizontal axis is the month. */
+        drawData.timeAxisScaleX = (drawData.timeAxisScaleX ? drawData.timeAxisScaleX : d3.scale.linear())
+            .domain([0, drawData.dataTimeLength])
+            .range([0, params.xStep * drawData.dataTimeLength]);
+
+    }
+
+    /**
+     * Creates the SNAKE visualisation functions.
+     */
+    function createGraphFunctions(drawData) {
+        /* Drawing functions, hi my name is MR HARDWIRE. 
+                    Good enough for first packaged version */
+        /* Top: inbound, Bottom: outbound */
+        drawData.areaTopGraph = (drawData.areaTopGraph ? drawData.areaTopGraph : d3.svg.area())
+            .x(function(d, i) {
+                return drawData.timeAxisScaleX(i);
+            })
+            .y(function(d) {
+                return 0;
+            })
+            .y1(function(d) {
+                return drawData.yScale(-d.inbound[drawData.keyToVisualize] || 0);
+            }).interpolate('basis');
+
+        drawData.areaBottomGraph = (drawData.areaBottomGraph ? drawData.areaBottomGraph : d3.svg.area())
+            .x(function(d, i) {
+                return drawData.timeAxisScaleX(i);
+            })
+            .y(function(d) {
+                return drawData.yScale(d.outbound[drawData.keyToVisualize] || 0);
+            })
+            .y1(function(d) {
+                return 0;
+            }).interpolate('basis');
+    }
+
+    function createAxis(drawData, userActivity) {
+        /* Time axis. Create +2 for pufferning the data end */
+        drawData.xAxis = (drawData.xAxis ? drawData.xAxis : d3.svg.axis())
+            .scale(drawData.timeAxisScaleX)
+            .orient("bottom")
+            .tickValues(_.range(drawData.dataTimeLength + 2))
+            .tickSize(-drawData.height)
+            .tickFormat(function(val) {
+                var timeKey = addTimeKey(drawData.firstAndLastMonthKey.firstMonthKey, val - 1);
+                if (timeKey.substr(4, 2) == '01')
+                    return timeKey.substr(0, 4);
+                else
+                    return (moment().month(parseInt(timeKey.substr(4, 2)) - 1).format('MMM'));
+            });
+
+        /* User list */
+        drawData.yAxis = (drawData.yAxis ? drawData.yAxis : d3.svg.axis())
+            .scale(drawData.yAllGraphScale)
+            .orient("left")
+            .tickSize(-drawData.width)
+            .tickValues(userActivity.map(function(user, index) {
+                return index;
+            }))
+            .tickFormat(function(val) {
+                return userActivity[val].userName;
+            });
+
+
+    }
+
+    /**
+     * Drawing information, sizez are computed from 
+     * the actual window size. To be recalculated on  
+     */
+    function calculateDimensions(drawData) {
+
+        drawData.margin = {
+            top: 32,
+            right: 0,
+            bottom: 50,
+            left: 100
+        };
+        drawData.width = window.innerWidth - drawData.margin.left - drawData.margin.right;
+        drawData.height = window.innerHeight - drawData.margin.top - drawData.margin.bottom;
+    }
+
+    /**
+     * Handles zoom events, updates coordinates,
+     * manages axis scales.
+     */
+    function zoomed(drawData) {
+        drawData.svg.select(".x.axis").call(drawData.xAxis);
+        drawData.svg.select(".y.axis").call(drawData.yAxis);
+        drawData.zoomContainer.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+        emphasizeYearTicks(drawData.timeAxisNodes);
+    }
+
+    /**
+     * Marks the year tick groups with a 'year' class.
+     */
     function emphasizeYearTicks(timeAxisNodes) {
         timeAxisNodes.selectAll('text').each(function() {
             if (+this.textContent) {
@@ -206,9 +294,11 @@ define([
         });
     }
 
-    function createUserAxe() {
-        return;
-    }
+    /**
+     * Iterates over the user database mapping the
+     * userActivity object to renderable lines, filling
+     * the empty data.
+     */
 
     function flattenUserData(userActivity, startSlot, dataLength) {
         return Object.keys(userActivity).map(function(userId) {
@@ -217,9 +307,12 @@ define([
     }
 
     /**
-     *  @returns the user line data.
+     * Creates an array from the userActivity object to a 
+     * renderable data array, filling in the non existing
+     * timekeys.
+     * 
+     * @returns the user line data array.
      */
-
     function createUserActivityArray(userActivity, startSlot, dataLength) {
 
         var activityArray = [];

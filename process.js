@@ -1,9 +1,35 @@
 define([
-    'knockout'
+    'knockout',
+    '_'
 
 ], function(ko) {
 
-    return process2;
+    return process3;
+
+    function process3(userActivity, filter) {
+
+        var ret = [];
+
+        for (var userId in userActivity) {
+            var drawUser = true;
+            var user = userActivity[userId];
+
+            /* Check for all minimum keys set in filter */
+            drawUser = drawUser && isUserFulfillingMinimumRequirements(user, filter.min);
+
+            /* Check, for minimum active months */
+            drawUser = drawUser && (user.sums.activeMonthCount > filter.minActiveMonthCount);
+            if (drawUser) {
+                ret.push(user);
+            }
+        }
+
+        console.log(ret, filter)
+        ret = _.sortBy(ret, filter.orderBy);
+
+        return ret;
+    }
+
 
     function process2(userActivity, filter) {
 
@@ -37,7 +63,7 @@ define([
         return ret;
     }
 
-    
+
 
 
     /**
