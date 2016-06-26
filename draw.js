@@ -2,10 +2,13 @@ define([
     'knockout',
     './draw-utils',
     'd3',
-    'moment'
+    'moment',
+    'json!lib/utils/colors.json'
 
 
-], function(ko, utils, d3, moment) {
+], function(ko, utils, d3, moment, colors) {
+
+    var drawData;
 
     return draw;
 
@@ -43,15 +46,15 @@ define([
     }
 
 
-    function draw(selector, userActivity, params, filter, colors) {
+
+    function draw(selector, userActivity, params, filter) {
+
 
         // Clear the former graph TEMP 
         $(selector).html('');
 
         /* Calculate drawing data */
         drawData = convertToDrawingData(userActivity, params);
-
-        drawData.colors = colors;
 
         /* Per user scale, take the max Y value to display
                     and since it is very rare, get the domain double.
@@ -125,6 +128,15 @@ define([
 
     }
 
+
+    /**
+     * Bind mouse events 
+     */
+    function bind(drawData) {
+
+    }
+
+
     /**
      * Creates data group objects, and sets their propertise
      */
@@ -139,11 +151,11 @@ define([
             return 'translate(0,' + (((i + 1) * drawData.params.yStep * 2) + ')');
         }).attr('class', 'markerr');
 
-        drawData.newDataGroups.append('rect')
-            .attr('width', drawData.timeAxisScaleX(drawData.dataTimeLength + 2))
-            .attr('height', drawData.params.yStep * 2)
-            .attr('transform', 'translate(0,' + (-drawData.maxY / 4) + ')')
-            .attr('class', 'userBoundingBox');
+        // drawData.newDataGroups.append('rect')
+        //     .attr('width', drawData.timeAxisScaleX(drawData.dataTimeLength + 2))
+        //     .attr('height', drawData.params.yStep * 2)
+        //     .attr('transform', 'translate(0,' + (-drawData.maxY / 4) + ')')
+        //     .attr('class', 'userBoundingBox');
 
         /* Top part of the graphs */
         drawData.newDataGroups.append("path")
@@ -153,8 +165,8 @@ define([
                 return Object.keys(drawData.userActivity)[i];
             })
             .style("fill", function(data, index) {
-                return drawData.colors[drawData.userActivity[index].id];
-            });
+                return getColor(drawData.userActivity[index].id);
+            }).on('mouseenter', mouseEnterToUser);
 
         /* Bottom part of the graph */
         drawData.newDataGroups.append("path")
@@ -164,9 +176,17 @@ define([
                 return Object.keys(drawData.userActivity)[i];
             })
             .style("fill", function(data, index) {
-                return drawData.colors[drawData.userActivity[index].id];
-            });
+                return getColor(drawData.userActivity[index].id);
+            }).on('mouseenter', mouseEnterToUser);
     }
+
+    function mouseEnterToUser(e, i) {
+        console.log(drawData.userActivity[i].userName);
+        app.selectedUser(drawData.userActivity[i]);
+        app.ui.statusColor(getColor(drawData.userActivity[i].id));
+        app.ui.status(drawData.userActivity[i].userName);
+    }
+
 
     /**
      * Sets the axis nodes properties
@@ -180,6 +200,27 @@ define([
         drawData.userAxis
             .attr("class", "y axis")
             .call(drawData.yAxis);
+    }
+
+
+    /**
+     * returns a color from the te collection. If not present, makes a random
+     * and saves it for later.
+     */
+    function getColor(id) {
+        if (!colors[id]) {
+            colors[id] = getRandomColor();
+        }
+        return colors[id];
+    }
+
+    function getRandomColor() {
+        var letters = '0123456789ABCDEF'.split('');
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
     }
 
 
@@ -290,7 +331,7 @@ define([
             .attr('height', 20).attr('width', 120)
             .attr('transform', 'translate(-120,-10)')
             .attr('fill', function(e, i) {
-                return drawData.colors[drawData.userActivity[i].id];
+                return getColor(drawData.userActivity[i].id);
             });
     }
 
