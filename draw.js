@@ -32,6 +32,8 @@ define([
             }));
         }));
         return {
+            userActivity: userActivity,
+            params: params,
             userDrawData: userDrawData,
             firstAndLastMonthKey: firstAndLastMonthKey,
             maxY: maxY,
@@ -48,6 +50,8 @@ define([
 
         /* Calculate drawing data */
         drawData = convertToDrawingData(userActivity, params);
+
+        drawData.colors = colors;
 
         /* Per user scale, take the max Y value to display
                     and since it is very rare, get the domain double.
@@ -101,58 +105,17 @@ define([
             .attr("height", drawData.height)
             .attr("class", "mainrect");
 
-        drawData.reference
-            .attr("fill", "rgba(200,200,200,0.2)")
-            .attr('transform', 'translate(0,' + drawData.yAllGraphScale(-0.5) + ')')
-            .attr("width", drawData.timeAxisScaleX(1))
-            .attr("height", 2 * params.yStep);
+        // drawData.reference
+        //     .attr("fill", "rgba(200,200,200,0.2)")
+        //     .attr('transform', 'translate(0,' + drawData.yAllGraphScale(-0.5) + ')')
+        //     .attr("width", drawData.timeAxisScaleX(1))
+        //     .attr("height", 2 * params.yStep);
 
-        drawData.timeAxisNodes
-            .attr("class", "x axis")
-            .attr("transform", "translate(0," + drawData.height + ")")
-            .call(drawData.xAxis);
+        setupAxisNodes(drawData);
 
-        drawData.userAxis
-            .attr("class", "y axis")
-            .call(drawData.yAxis);
+        appendContent(drawData);
 
-        /* Conent */
-        drawData.data = drawData.zoomContainer.selectAll("g")
-            .data(drawData.userDrawData);
-
-        drawData.newDataGroups = drawData.data.enter().append('g');
-
-        drawData.newDataGroups.attr("transform", function(d, i) {
-            return 'translate(0,' + (((i + 1) * params.yStep * 2) + ')');
-        }).attr('class', 'markerr');
-
-        drawData.newDataGroups.append('rect')
-            .attr('width', drawData.timeAxisScaleX(drawData.dataTimeLength + 2))
-            .attr('height', drawData.maxY / 2)
-            .attr('transform', 'translate(0,' + (-drawData.maxY / 4) + ')')
-            .attr('class', 'userBoundingBox');
-
-        /* Top part of the graphs */
-        drawData.newDataGroups.append("path")
-            .attr("d", drawData.areaTopGraph)
-            .attr('class', 'top')
-            .attr("userId", function(d, i) {
-                return Object.keys(userActivity)[i];
-            })
-            .style("fill", function(data, index) {
-                return colors[userActivity[index].id];
-            });
-
-        /* Bottom part of the graph */
-        drawData.newDataGroups.append("path")
-            .attr("d", drawData.areaBottomGraph)
-            .attr('class', 'bottom')
-            .attr("userId", function(d, i) {
-                return Object.keys(userActivity)[i];
-            })
-            .style("fill", function(data, index) {
-                return colors[userActivity[index].id];
-            });
+        colorAxisNames(drawData);
 
         drawData.data.exit().remove();
 
@@ -161,6 +124,64 @@ define([
 
 
     }
+
+    /**
+     * Creates data group objects, and sets their propertise
+     */
+    function appendContent(drawData) {
+
+        drawData.data = drawData.zoomContainer.selectAll("g")
+            .data(drawData.userDrawData);
+
+        drawData.newDataGroups = drawData.data.enter().append('g');
+
+        drawData.newDataGroups.attr("transform", function(d, i) {
+            return 'translate(0,' + (((i + 1) * drawData.params.yStep * 2) + ')');
+        }).attr('class', 'markerr');
+
+        drawData.newDataGroups.append('rect')
+            .attr('width', drawData.timeAxisScaleX(drawData.dataTimeLength + 2))
+            .attr('height', drawData.params.yStep * 2)
+            .attr('transform', 'translate(0,' + (-drawData.maxY / 4) + ')')
+            .attr('class', 'userBoundingBox');
+
+        /* Top part of the graphs */
+        drawData.newDataGroups.append("path")
+            .attr("d", drawData.areaTopGraph)
+            .attr('class', 'top')
+            .attr("userId", function(d, i) {
+                return Object.keys(drawData.userActivity)[i];
+            })
+            .style("fill", function(data, index) {
+                return drawData.colors[drawData.userActivity[index].id];
+            });
+
+        /* Bottom part of the graph */
+        drawData.newDataGroups.append("path")
+            .attr("d", drawData.areaBottomGraph)
+            .attr('class', 'bottom')
+            .attr("userId", function(d, i) {
+                return Object.keys(drawData.userActivity)[i];
+            })
+            .style("fill", function(data, index) {
+                return drawData.colors[drawData.userActivity[index].id];
+            });
+    }
+
+    /**
+     * Sets the axis nodes properties
+     */
+    function setupAxisNodes(drawData) {
+        drawData.timeAxisNodes
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + drawData.height + ")")
+            .call(drawData.xAxis);
+
+        drawData.userAxis
+            .attr("class", "y axis")
+            .call(drawData.yAxis);
+    }
+
 
     /**
      * Sets up the two Y and one X scale.
@@ -251,9 +272,26 @@ define([
             }))
             .tickFormat(function(val) {
                 return userActivity[val].userName;
+            })
+            // .attr('userId', function(val) {
+            //     return userActivity[val].id;
+            // });
+
+
+    }
+
+    /**
+     * Creates colored rectangles for user's names to the Y Axis.
+     */
+
+    function colorAxisNames(drawData) {
+
+        drawData.userAxis.selectAll('g.tick').insert('rect', ':first-child')
+            .attr('height', 20).attr('width', 120)
+            .attr('transform', 'translate(-120,-10)')
+            .attr('fill', function(e, i) {
+                return drawData.colors[drawData.userActivity[i].id];
             });
-
-
     }
 
     /**
@@ -281,6 +319,7 @@ define([
         drawData.svg.select(".y.axis").call(drawData.yAxis);
         drawData.zoomContainer.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
         emphasizeYearTicks(drawData.timeAxisNodes);
+
     }
 
     /**
