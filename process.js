@@ -26,6 +26,10 @@ define([
 
         ret = _.sortBy(ret, filter.orderBy);
 
+        if (filter.descendingOrderBy) {
+            ret = ret.reverse();
+        }
+
         return ret;
     }
 
