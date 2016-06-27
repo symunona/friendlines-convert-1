@@ -243,7 +243,7 @@ define([
         /* Once these assignments have been initialized, they will 
             update on every new call. */
         drawData.yScale = (drawData.yScale || d3.scale.linear())
-            .domain([-drawData.maxY / 4, drawData.maxY / 4])
+            .domain([-drawData.maxY / params.divider, drawData.maxY / params.divider])
             .range([-params.yStep, params.yStep]);
 
         /* Each user is one line, the double of the  */
