@@ -192,6 +192,31 @@ define([
             .on('mouseenter', mouseEnterToUser)
             .on('click', mouseClick);
 
+        if (drawData.params.layerTwoKey) {
+            // d3.svg.line()
+
+            /* Top part of the graphs */
+            drawData.newDataGroups.append("path")
+                .attr("d", drawData.secondLayerPathTop)
+                .attr('class', 'top')
+                .attr("userId", function(d, i) {
+                    return Object.keys(drawData.userActivity)[i];
+                })
+                .style("stroke", '#999');
+
+            /* Bottom part of the graph */
+            drawData.newDataGroups.append("path")
+                .attr("d", drawData.areaBottomGraph)
+                .attr('class', 'bottom')
+                .attr("userId", function(d, i) {
+                    return Object.keys(drawData.userActivity)[i];
+                })
+                .style("stroke", '#bbb');
+
+
+        }
+
+
     }
 
 
@@ -356,6 +381,28 @@ define([
             .y1(function(d) {
                 return 0;
             }).interpolate('basis');
+
+        if (drawData.params.layerTwoKey) {
+            drawData.secondLayerPathTop = (drawData.secondLayerPathTop ? drawData.secondLayerPathTop : d3.svg.line())
+                .x(function(d, i) {
+                    return drawData.timeAxisScaleX(i);
+                })
+                .y(function(d) {
+                    return drawData.yScale(d.inbound[drawData.params.layerTwoKey] || drawData.params.minY);
+                })
+                .interpolate('basis');
+
+            drawData.secondLayerPathBottom = (drawData.secondLayerPathBottom ? drawData.secondLayerPathBottom : d3.svg.line())
+                .x(function(d, i) {
+                    return drawData.timeAxisScaleX(i);
+                })
+                .y(function(d) {
+                    return drawData.yScale(d.outbound[drawData.params.layerTwoKey] || drawData.params.minY);
+                })
+                .interpolate('basis');
+
+        }
+
     }
 
 
