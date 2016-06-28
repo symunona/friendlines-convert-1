@@ -62,7 +62,11 @@ define([
 
         initializeScales(drawData, params);
 
-        createGraphFunctions(drawData);
+        if (params.type == 2) {
+            createGraphFunctionsFlat(drawData);
+        } else {
+            createGraphFunctions(drawData);
+        }
 
         calculateDimensions(drawData);
 
@@ -116,7 +120,11 @@ define([
 
         setupAxisNodes(drawData);
 
-        appendContent(drawData);
+        if (params.type == 2) {
+            appendContentType2(drawData);
+        } else {
+            appendContent(drawData);
+        }
 
         colorAxisNames(drawData);
 
@@ -166,7 +174,9 @@ define([
             })
             .style("fill", function(data, index) {
                 return getColor(drawData.userActivity[index].id);
-            }).on('mouseenter', mouseEnterToUser);
+            })
+            .on('mouseenter', mouseEnterToUser)
+            .on('click', mouseClick);
 
         /* Bottom part of the graph */
         drawData.newDataGroups.append("path")
@@ -177,14 +187,74 @@ define([
             })
             .style("fill", function(data, index) {
                 return getColor(drawData.userActivity[index].id);
-            }).on('mouseenter', mouseEnterToUser);
+            })
+            .style("opacity", 0.7)
+            .on('mouseenter', mouseEnterToUser)
+            .on('click', mouseClick);
+
     }
+
+
+
+    /**
+     * Creates data group objects, and sets their propertise
+     */
+    function appendContentType2(drawData) {
+
+        drawData.data = drawData.zoomContainer.selectAll("g")
+            .data(drawData.userDrawData);
+
+        drawData.newDataGroups = drawData.data.enter().append('g');
+
+        drawData.newDataGroups.attr("transform", function(d, i) {
+            return 'translate(0,' + (((i + 1) * drawData.params.yStep * 2) + ')');
+        }).attr('class', 'markerr');
+
+        // drawData.newDataGroups.append('rect')
+        //     .attr('width', drawData.timeAxisScaleX(drawData.dataTimeLength + 2))
+        //     .attr('height', drawData.params.yStep * 2)
+        //     .attr('transform', 'translate(0,' + (-drawData.maxY / 4) + ')')
+        //     .attr('class', 'userBoundingBox');
+
+        /* Top part of the graphs */
+        drawData.newDataGroups.append("path")
+            .attr("d", drawData.areaTopGraph)
+            .attr('class', 'top')
+            .attr("userId", function(d, i) {
+                return Object.keys(drawData.userActivity)[i];
+            })
+            .style("fill", function(data, index) {
+                return getColor(drawData.userActivity[index].id);
+            })
+            .on('mouseenter', mouseEnterToUser)
+            .on('click', mouseClick);
+
+        /* Bottom part of the graph */
+        // drawData.newDataGroups.append("path")
+        //     .attr("d", drawData.areaBottomGraph)
+        //     .attr('class', 'bottom')
+        //     .attr("userId", function(d, i) {
+        //         return Object.keys(drawData.userActivity)[i];
+        //     })
+        //     .style("fill", function(data, index) {
+        //         return getColor(drawData.userActivity[index].id);
+        //     })
+        //     .style("opacity", 0.7)
+        //     .on('mouseenter', mouseEnterToUser)
+        //     .on('click', mouseClick);
+
+    }
+
 
     function mouseEnterToUser(e, i) {
         console.log(drawData.userActivity[i].userName);
         app.selectedUser(drawData.userActivity[i]);
         app.ui.statusColor(getColor(drawData.userActivity[i].id));
         app.ui.status(drawData.userActivity[i].userName);
+    }
+
+    function mouseClick(e, i) {
+        app.ui.visible.status(true);
     }
 
 
@@ -273,7 +343,7 @@ define([
                 return 0;
             })
             .y1(function(d) {
-                return drawData.yScale(-d.inbound[drawData.keyToVisualize] || 0);
+                return drawData.yScale(-d.inbound[drawData.keyToVisualize] || drawData.params.minY);
             }).interpolate('basis');
 
         drawData.areaBottomGraph = (drawData.areaBottomGraph ? drawData.areaBottomGraph : d3.svg.area())
@@ -281,11 +351,33 @@ define([
                 return drawData.timeAxisScaleX(i);
             })
             .y(function(d) {
-                return drawData.yScale(d.outbound[drawData.keyToVisualize] || 0);
+                return drawData.yScale(d.outbound[drawData.keyToVisualize] || drawData.params.minY);
             })
             .y1(function(d) {
                 return 0;
             }).interpolate('basis');
+    }
+
+
+    /**
+     * Creates the SNAKE visualisation functions.
+     */
+    function createGraphFunctionsFlat(drawData) {
+        /* Drawing functions, hi my name is MR HARDWIRE. 
+                    Good enough for first packaged version */
+        /* Top: inbound, Bottom: outbound */
+        drawData.areaTopGraph = (drawData.areaTopGraph ? drawData.areaTopGraph : d3.svg.area())
+            .x(function(d, i) {
+                return drawData.timeAxisScaleX(i);
+            })
+            .y(function(d) {
+                return 0;
+            })
+            .y1(function(d) {
+                // console.log(d)
+                return d.sum[drawData.keyToVisualize] > drawData.params.error ? drawData.params.yFlatHeight : 0;
+            }).interpolate('step-before');
+
     }
 
     function createAxis(drawData, userActivity) {
@@ -406,7 +498,7 @@ define([
                 timeSlotKey: timeSlotKey,
                 inbound: {},
                 outbound: {},
-                sums: {}
+                sum: {}
             }, userActivity.monthData[timeSlotKey]));
 
         }
