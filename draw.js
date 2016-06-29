@@ -3,10 +3,11 @@ define([
     './draw-utils',
     'd3',
     'moment',
-    'json!lib/utils/colors.json'
+    'json!lib/utils/colors.json',
+    'lib/stat'
 
 
-], function(ko, utils, d3, moment, colors) {
+], function(ko, utils, d3, moment, colors, stat) {
 
     var drawData;
 
@@ -279,7 +280,9 @@ define([
     }
 
     function mouseClick(e, i) {
-        app.ui.visible.status(true);
+        // app.ui.visible.status(true);        
+        stat.openUser(drawData.userActivity[i].id);
+
     }
 
 

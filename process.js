@@ -24,7 +24,27 @@ define([
             }
         }
 
-        ret = _.sortBy(ret, filter.orderBy);
+        var level1 = filter.orderBy.split('.')[0];
+        var level2 = filter.orderBy.split('.').length > 1 ? filter.orderBy.split('.')[1] : false;
+
+
+        ret = ret.sort(function(a, b) {
+            var la1 = a[level1] || 0,
+                la2 = b[level1] || 0;
+            if (level2) {
+                la1 = la1[level2] || 0;
+                la2 = la2[level2] || 0;
+            }
+
+            if (la1 > la2) return 1;
+            if (la1 < la2) return -1;
+            return 0;
+        });
+
+        // console.log(ret.map(function(e) {
+        //     return level2 ? e[level1][level2] : e[level1];
+        // }));
+
 
         if (filter.descendingOrderBy) {
             ret = ret.reverse();
