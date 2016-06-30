@@ -203,7 +203,8 @@ define([
                 .attr("userId", function(d, i) {
                     return Object.keys(drawData.userActivity)[i];
                 })
-                .style("stroke", '#999');
+                .style("stroke", '#0f0')
+                .style('fill', 'none');
 
             /* Bottom part of the graph */
             drawData.newDataGroups.append("path")
@@ -212,7 +213,9 @@ define([
                 .attr("userId", function(d, i) {
                     return Object.keys(drawData.userActivity)[i];
                 })
-                .style("stroke", '#bbb');
+                .style("stroke", '#f00')
+                .style('fill', 'none');
+
 
 
         }
@@ -400,7 +403,7 @@ define([
                     return drawData.timeAxisScaleX(i);
                 })
                 .y(function(d) {
-                    return drawData.yScale(d.outbound[drawData.params.layerTwoKey] || drawData.params.minY);
+                    return drawData.yScale(-d.outbound[drawData.params.layerTwoKey] || drawData.params.minY);
                 })
                 .interpolate('basis');
 
