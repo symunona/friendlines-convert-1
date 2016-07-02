@@ -183,7 +183,7 @@ define([
                 return getColor(drawData.userActivity[index].id);
             })
             .on('mouseenter', mouseEnterToUser)
-            .on('click', mouseClick);
+            .on('mouseup', openUser);
 
         /* Bottom part of the graph */
         drawData.newDataGroups.append("path")
@@ -197,7 +197,7 @@ define([
             })
             .style("opacity", 0.7)
             .on('mouseenter', mouseEnterToUser)
-            .on('click', mouseClick);
+            .on('mouseup', openUser);
 
         if (drawData.params.layerTwoKey) {
             // d3.svg.line()
@@ -295,21 +295,7 @@ define([
                 return getColor(drawData.userActivity[index].id);
             })
             .on('mouseenter', mouseEnterToUser)
-            .on('click', mouseClick);
-
-        /* Bottom part of the graph */
-        // drawData.newDataGroups.append("path")
-        //     .attr("d", drawData.areaBottomGraph)
-        //     .attr('class', 'bottom')
-        //     .attr("userId", function(d, i) {
-        //         return Object.keys(drawData.userActivity)[i];
-        //     })
-        //     .style("fill", function(data, index) {
-        //         return getColor(drawData.userActivity[index].id);
-        //     })
-        //     .style("opacity", 0.7)
-        //     .on('mouseenter', mouseEnterToUser)
-        //     .on('click', mouseClick);
+            .on('click', openUser);
 
     }
 
@@ -319,13 +305,15 @@ define([
         app.selectedUser(drawData.userActivity[i]);
         app.ui.statusColor(getColor(drawData.userActivity[i].id));
         app.ui.status(drawData.userActivity[i].userName);
-
+        drawData.moved = false;
     }
 
-    function mouseClick(e, i) {
-        // app.ui.visible.status(true);        
-        stat.openUser(drawData.userActivity[i].id);
 
+    function openUser(e, i) {
+        /* Only open if not panning */
+        console.log('moved', drawData.moved);
+        if (!drawData.moved)
+            stat.openUser(drawData.userActivity[i].id);
     }
 
 
@@ -551,6 +539,8 @@ define([
         drawData.zoomContainer.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
         emphasizeYearTicks(drawData.timeAxisNodes);
 
+        /* Do not open userscreen when panning */
+        drawData.moved = true;
     }
 
     /**
