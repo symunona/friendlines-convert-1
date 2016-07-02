@@ -4,14 +4,19 @@ define([
     'd3',
     'moment',
     'json!lib/utils/colors.json',
-    'lib/stat'
+    'lib/stat',
+    'lib/search'
 
 
-], function(ko, utils, d3, moment, colors, stat) {
+], function(ko, utils, d3, moment, colors, stat, search) {
 
     var drawData;
 
-    return draw;
+    return {
+        draw: draw,
+        showSearchResults: showSearchResults
+
+    };
 
 
     function convertToDrawingData(userActivity, params) {
@@ -48,7 +53,7 @@ define([
 
 
 
-    function draw(selector, userActivity, params, filter) {
+    function draw(selector, userActivity, params, filter, metadata) {
 
 
         // Clear the former graph TEMP 
@@ -56,6 +61,8 @@ define([
 
         /* Calculate drawing data */
         drawData = convertToDrawingData(userActivity, params);
+
+        drawData.metadata = metadata;
 
         /* Per user scale, take the max Y value to display
                     and since it is very rare, get the domain double.
@@ -133,7 +140,6 @@ define([
 
         emphasizeYearTicks(drawData.timeAxisNodes);
         drawData.initialized = true;
-
 
     }
 
@@ -219,7 +225,40 @@ define([
 
 
         }
+    }
 
+    function showSearchResults(messages) {
+        drawData.zoom.scale(1);
+        drawData.zoom.translate([0, 0]);
+
+        drawData.searchResults = drawData.zoomContainer.selectAll("circle")
+            .data(messages);
+
+        drawData.newSearchResults = drawData.searchResults.enter();
+
+        drawData.newSearchResults.append("circle")
+            .attr("r", drawData.params.yStep / 2)
+            .attr('cy', function(message, i) {
+                var userId = message.fromUserId == drawData.metadata.mainUserId ? message.toUserId : message.fromUserId;
+
+                var user = drawData.userActivity.find(function(e) {
+                    return e.id == userId;
+                });
+
+                return drawData.yAllGraphScale(drawData.userActivity.indexOf(user));
+            })
+            .attr('cx', function(message, i) {
+
+                var slot = getSlotDifference(toTimeKey(message.sendDate), drawData.firstAndLastMonthKey.firstMonthKey);
+                return drawData.timeAxisScaleX(slot);
+            })
+            // .style("stroke", 'green')
+            .style('fill', 'red')
+            .attr('class', 'search-result')
+            .on('click', function(message) {
+                search.openThread(message);
+            });
+        drawData.searchResults.exit().remove();
 
     }
 
@@ -276,10 +315,11 @@ define([
 
 
     function mouseEnterToUser(e, i) {
-        console.log(drawData.userActivity[i].userName);
+        // console.log(drawData.userActivity[i].userName);
         app.selectedUser(drawData.userActivity[i]);
         app.ui.statusColor(getColor(drawData.userActivity[i].id));
         app.ui.status(drawData.userActivity[i].userName);
+
     }
 
     function mouseClick(e, i) {
@@ -301,6 +341,11 @@ define([
         drawData.userAxis
             .attr("class", "y axis")
             .call(drawData.yAxis);
+
+        drawData.svg.selectAll('.tick')
+            .on('click', function(i) {
+                stat.openUser(drawData.userActivity[i].id);
+            });
     }
 
 
@@ -579,6 +624,10 @@ define([
     function getSlotDifference(yyyymm1, yyyymm2) {
         return moment(yyyymm1, "YYYYMM").diff(moment(yyyymm2, "YYYYMM"), 'months');
 
+    }
+
+    function toTimeKey(date) {
+        return moment(date).format('YYYYMM');
     }
 
     /**

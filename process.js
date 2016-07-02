@@ -63,7 +63,7 @@ define([
 
     function isUserFulfillingMinimumRequirements(user, minimums) {
         for (var k in minimums) {
-            if (user.sums[k] < minimums[k]) return false;
+            if (user.sums[k] <= minimums[k]) return false;
         }
         return true;
     }
